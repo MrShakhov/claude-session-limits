@@ -12,8 +12,8 @@ tracked sessions spent, then shows each session's share of the current windows.
 Growth with no tracked spend (claude.ai, sessions without the mod) shows as
 untracked.
 
-Open the pane with `/session-limits`; it also opens at session start. A band
-above the prompt shows this session's share of both windows, with a Лимиты
+Open the pane with `/session-limits`; it stays closed until asked for. A band
+above the prompt shows this session's share of both windows, with a Подробнее
 button that opens the pane (the desktop app's own pane buttons take no
 plugin's).
 
