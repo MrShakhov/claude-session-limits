@@ -84,3 +84,59 @@ test('the pane shows this session and a parallel one', async ($, on) => {
   }
   expect(Object.keys(files)).toContain('me.json')
 })
+
+test('the band above the prompt shows the share and opens the pane', async ($, on) => {
+  const opened: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('command.register', () => ({ value: { command: 'session-limits' } }))
+  on('ui.open', (_, e) => {
+    opened.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+  on('session.surfaces', () => ({ value: [] }))
+  on('clock.now', () => ({ value: NOW }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+  on('session.id', () => ({ value: 'me' }))
+  on('session.cwd', () => ({ value: '/Users/x/Dev/project-a' }))
+  on('session.usage', () => ({
+    value: {
+      startedAt: NOW - 3600_000,
+      context: {} as never,
+      cost: { usd: 3 },
+      rateLimits: [
+        { kind: 'five_hour', percentUsed: 8, resetsAt: new Date(NOW + 4 * 3600_000).toISOString() },
+      ],
+    },
+  }))
+  on('fs.read', () => {
+    throw new Error('ENOENT')
+  })
+  on('fs.write', () => ({ value: undefined }))
+  on('fs.list', () => ({ value: [] }))
+  on('store.get', () => ({ value: { five_hour: { k: 2 } } }))
+  on('store.set', () => ({ value: undefined }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.measure({ context: {} as never, rateLimits: [], changed: ['cost'] })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'session-limits',
+      surface,
+      component: 'AbovePrompt',
+      props: {
+        hasSurvey: false,
+        isWorking: false,
+        maxRows: 10,
+        bodyColumns: 60,
+        scroll: { offset: 0, bodyRows: 10 },
+        view: {},
+      },
+    })
+    expect((await ui.find({ type: 'Text', text: /^Эта сессия: 5 ч/ }))?.text).toContain('≈')
+    await ui.press({ key: 'open-limits' })
+    await ui.unmount()
+  }
+  expect(opened).toEqual(['session-limits', 'session-limits'])
+})

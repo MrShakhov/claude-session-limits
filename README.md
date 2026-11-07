@@ -12,7 +12,10 @@ tracked sessions spent, then shows each session's share of the current windows.
 Growth with no tracked spend (claude.ai, sessions without the mod) shows as
 untracked.
 
-Open the pane with `/session-limits`; it also opens at session start.
+Open the pane with `/session-limits`; it also opens at session start. A band
+above the prompt shows this session's share of both windows, with a Лимиты
+button that opens the pane (the desktop app's own pane buttons take no
+plugin's).
 
 The meter arrives in whole percents, so a calibration is only as good as the
 meter growth it rests on; the pane shows the estimate's error (±) next to it.
