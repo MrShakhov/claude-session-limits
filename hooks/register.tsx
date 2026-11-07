@@ -17,8 +17,9 @@ import {
 const PANE = 'session-limits'
 const TITLE = 'Лимиты сессии'
 const POLL_MS = 30_000
-/** Cells of each window's meter in the band above the prompt. */
+/** Each window's meter in the band: cells on the terminal, CSS px elsewhere. */
 const BAND_CELLS = 8
+const METER_PX = 64
 const STALE_FILE_MS = 8 * 24 * 3600_000
 const MAX_FILES = 80
 // Bumped when stored calibrations stop being trustworthy: 0.1.0 kept ones
@@ -208,50 +209,72 @@ export const register: Register = on => {
   })
 
   // The app's own pane buttons (browser, files) take no plugin's: a band
-  // above the prompt carries this session's share and the way back in. The
-  // whole row is one press, so it reads as a chip, not a label and a button.
+  // above the prompt carries this session's share and the way back in.
+  // A Button draws its children as one plain label, so the meters and colors
+  // sit in a Box and the Button is only the link at the end.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    const Svg = 'Svg' in ui ? ui.Svg : null
     const view = await read($, viewAtom)
-    const open = async () => {
-      void tick($)
-      await $.ui.open({ id: PANE, title: TITLE })
-    }
     const windows = (view?.windows ?? []).filter(w => !w.isStale)
     const hasMeters = e.props.bodyColumns >= 56
 
     const meter = (w: WindowView) => {
       const mine = clamp(w.minePct ?? 0)
-      const used = clamp(w.accountPct)
+      const used = Math.max(mine, clamp(w.accountPct))
+      if (Svg) {
+        return (
+          <Svg
+            source={meterSvg(mine, used)}
+            alt={`аккаунт ${w.accountPct.toFixed(0)}%, эта сессия ${pct(w.minePct)}`}
+            width={METER_PX}
+            height={6}
+          />
+        )
+      }
       const a = Math.min(BAND_CELLS, Math.round((mine / 100) * BAND_CELLS) || (mine > 0 ? 1 : 0))
       const b = Math.max(0, Math.min(BAND_CELLS - a, Math.round((used / 100) * BAND_CELLS) - a))
-      return [
-        <Text color="claude">{'━'.repeat(a)}</Text>,
-        <Text color="inactive">{'━'.repeat(b)}</Text>,
-        <Text dimColor>{'─'.repeat(BAND_CELLS - a - b)}</Text>,
-      ]
+      return (
+        <Text>
+          <Text color="claude">{'━'.repeat(a)}</Text>
+          <Text color="inactive">{'━'.repeat(b)}</Text>
+          <Text dimColor>{'─'.repeat(BAND_CELLS - a - b)}</Text>
+        </Text>
+      )
     }
 
-    const chip = (w: WindowView, i: number) => [
-      i > 0 ? <Text dimColor>{'   '}</Text> : null,
-      <Text dimColor>{w.kind === 'five_hour' ? '5 ч ' : 'неделя '}</Text>,
-      ...(hasMeters ? [...meter(w), <Text>{' '}</Text>] : []),
-      <Text color="claude" weight="semibold" tabular>
-        {pct(w.minePct)}
-      </Text>,
-    ]
+    const chip = (w: WindowView) => (
+      <Box key={w.kind} flexDirection="row" alignItems="center" gap={1}>
+        <Text dimColor>{w.kind === 'five_hour' ? '5 ч' : 'Неделя'}</Text>
+        {hasMeters && meter(w)}
+        <Text color="claude" weight="semibold" tabular>
+          {pct(w.minePct)}
+        </Text>
+      </Box>
+    )
 
     return (
-      <Button key="open-limits" plain onPress={open}>
-        <Text weight="medium">{'Лимиты сессии  '}</Text>
-        {windows.length > 0 ? (
-          windows.flatMap(chip)
-        ) : (
-          <Text dimColor>{view ? 'ждём ответ API' : 'собираю данные…'}</Text>
-        )}
-        <Text dimColor>{'  ›'}</Text>
-      </Button>
+      <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
+        <Box flexDirection="row" alignItems="center" gap={3} flexShrink={1}>
+          <Text weight="medium">Лимиты сессии</Text>
+          {windows.length > 0 ? (
+            windows.map(chip)
+          ) : (
+            <Text dimColor>{view ? 'ждём ответ API' : 'собираю данные…'}</Text>
+          )}
+        </Box>
+        <Button
+          key="open-limits"
+          label="Подробнее"
+          plain
+          onPress={async () => {
+            void tick($)
+            await $.ui.open({ id: PANE, title: TITLE })
+          }}
+        />
+      </Box>
     )
   })
 
@@ -343,6 +366,25 @@ export const register: Register = on => {
       </Box>
     )
   })
+}
+
+/**
+ * A rounded two-tone meter: the account's use in a neutral tone, this
+ * session's part in Claude's accent over it. Grays at partial opacity read on
+ * a light and a dark background alike, as an Svg knows no theme.
+ */
+function meterSvg(minePct: number, usedPct: number): string {
+  const w = METER_PX
+  const x = (p: number) => (p <= 0 ? 0 : Math.max(3, (p / 100) * w)).toFixed(1)
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="6" viewBox="0 0 ${w} 6">` +
+    `<defs><clipPath id="r"><rect width="${w}" height="6" rx="3"/></clipPath></defs>` +
+    `<g clip-path="url(#r)">` +
+    `<rect width="${w}" height="6" fill="#8a8a8a" fill-opacity="0.22"/>` +
+    `<rect width="${x(usedPct)}" height="6" fill="#8a8a8a" fill-opacity="0.55"/>` +
+    `<rect width="${x(minePct)}" height="6" fill="#D97757"/>` +
+    `</g></svg>`
+  )
 }
 
 function clamp(x: number) {

@@ -136,6 +136,9 @@ test('the band above the prompt shows the share and opens the pane', async ($, o
     })
     expect(await ui.find({ type: 'Text', text: /^Лимиты сессии/ })).toBeTruthy()
     expect((await ui.find({ type: 'Text', text: /^≈/ }))?.text).toMatch(/%$/)
+    const svg = await ui.find({ type: 'Svg' })
+    if (surface === 'desktop') expect(svg).toBeTruthy()
+    else expect(svg).toBeFalsy()
     await ui.press({ key: 'open-limits' })
     await ui.unmount()
   }
