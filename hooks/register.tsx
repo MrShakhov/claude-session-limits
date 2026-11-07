@@ -39,21 +39,7 @@ const S: {
   hasCost: boolean
   running: Promise<void> | null
   isAgain: boolean
-  /** The pane was placed once; a closed pane is not reopened unasked. */
-  isPlaced: boolean
-} = { ledger: null, dir: null, hasCost: false, running: null, isAgain: false, isPlaced: false }
-
-/** Opens the pane once a surface can draw it; a session starts with none. */
-async function openPane($: Api) {
-  if (S.isPlaced) return
-  try {
-    if ((await $.session.surfaces()).length === 0) return
-    const opened = await $.ui.open({ id: PANE, title: TITLE })
-    if (opened.isPlaced) S.isPlaced = true
-  } catch {
-    // No surface attached yet: session.attach tries again.
-  }
-}
+} = { ledger: null, dir: null, hasCost: false, running: null, isAgain: false }
 
 
 /** Every session writes its own file in one folder all sessions share. */
@@ -179,15 +165,10 @@ export const register: Register = on => {
       description: 'Открыть панель: сколько 5-часового и недельного лимита ест эта сессия',
     })
     $.clock.every(POLL_MS, () => void tick($))
+    // The pane stays closed until asked for: the band above the prompt
+    // carries the share and opens it.
     void tick($)
-    void openPane($)
     return started
-  })
-
-  on('session.attach', async ($, e, next) => {
-    const attached = await next(e)
-    void openPane($)
-    return attached
   })
 
   on('session.measure', async ($, e, next) => {

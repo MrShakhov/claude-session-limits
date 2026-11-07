@@ -1,6 +1,6 @@
 {
   "name": "session-limits",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Estimates how much of the 5-hour and weekly plan limits this session uses, splitting the account meter across parallel sessions by their cost",
   "author": {
     "name": "MrShakhov"

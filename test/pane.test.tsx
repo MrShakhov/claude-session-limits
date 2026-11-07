@@ -34,7 +34,11 @@ test('the pane shows this session and a parallel one', async ($, on) => {
   }
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'session-limits' } }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  let opens = 0
+  on('ui.open', () => {
+    opens++
+    return { value: { isPlaced: true } }
+  })
   on('session.surfaces', () => ({ value: ['desktop'] }))
   on('clock.now', () => ({ value: NOW }))
   on('clock.every', () => ({ value: undefined }))
@@ -74,6 +78,8 @@ test('the pane shows this session and a parallel one', async ($, on) => {
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await $.session.measure({ context: {} as never, rateLimits: [], changed: ['cost'] })
+  // Only the band shows at start: the pane waits to be asked for.
+  expect(opens).toBe(0)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, plugin: 'session-limits', surface })
