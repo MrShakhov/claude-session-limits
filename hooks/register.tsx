@@ -205,6 +205,34 @@ export const register: Register = on => {
     }
   })
 
+  // The app's own pane buttons (browser, files) take no plugin's: a band
+  // above the prompt carries this session's share and the way back in.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const view = await read($, viewAtom)
+    const share = (kind: WindowKind, label: string) => {
+      const w = view?.windows.find(x => x.kind === kind)
+      return w && !w.isStale ? `${label} ${pct(w.minePct)}` : null
+    }
+    const parts = [share('five_hour', '5 ч'), share('seven_day', 'неделя')].filter(Boolean)
+    const summary = view ? parts.join(' · ') || 'ждём лимиты' : 'собираю данные…'
+
+    return (
+      <Box flexDirection="row" justifyContent="space-between">
+        <Text dimColor wrap="truncate-end">{`Эта сессия: ${summary}`}</Text>
+        <Button
+          key="open-limits"
+          label="Лимиты"
+          onPress={async () => {
+            void tick($)
+            await $.ui.open({ id: PANE, title: TITLE })
+          }}
+        />
+      </Box>
+    )
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
     const view = await read($, viewAtom)
