@@ -1,0 +1,13 @@
+{
+  "name": "claude-session-limits",
+  "owner": {
+    "name": "MrShakhov"
+  },
+  "plugins": [
+    {
+      "name": "session-limits",
+      "source": "./"
+    }
+  ],
+  "description": "Claude Code mod: how much of the plan limits each session uses"
+}
