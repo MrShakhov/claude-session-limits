@@ -134,7 +134,8 @@ test('the band above the prompt shows the share and opens the pane', async ($, o
         view: {},
       },
     })
-    expect((await ui.find({ type: 'Text', text: /^Эта сессия: 5 ч/ }))?.text).toContain('≈')
+    expect(await ui.find({ type: 'Text', text: /^Лимиты сессии/ })).toBeTruthy()
+    expect((await ui.find({ type: 'Text', text: /^≈/ }))?.text).toMatch(/%$/)
     await ui.press({ key: 'open-limits' })
     await ui.unmount()
   }

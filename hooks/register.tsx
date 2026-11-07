@@ -17,6 +17,8 @@ import {
 const PANE = 'session-limits'
 const TITLE = 'Лимиты сессии'
 const POLL_MS = 30_000
+/** Cells of each window's meter in the band above the prompt. */
+const BAND_CELLS = 8
 const STALE_FILE_MS = 8 * 24 * 3600_000
 const MAX_FILES = 80
 // Bumped when stored calibrations stop being trustworthy: 0.1.0 kept ones
@@ -206,30 +208,50 @@ export const register: Register = on => {
   })
 
   // The app's own pane buttons (browser, files) take no plugin's: a band
-  // above the prompt carries this session's share and the way back in.
+  // above the prompt carries this session's share and the way back in. The
+  // whole row is one press, so it reads as a chip, not a label and a button.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const { Button, Text } = $.ui.resolve(e)
     const view = await read($, viewAtom)
-    const share = (kind: WindowKind, label: string) => {
-      const w = view?.windows.find(x => x.kind === kind)
-      return w && !w.isStale ? `${label} ${pct(w.minePct)}` : null
+    const open = async () => {
+      void tick($)
+      await $.ui.open({ id: PANE, title: TITLE })
     }
-    const parts = [share('five_hour', '5 ч'), share('seven_day', 'неделя')].filter(Boolean)
-    const summary = view ? parts.join(' · ') || 'ждём лимиты' : 'собираю данные…'
+    const windows = (view?.windows ?? []).filter(w => !w.isStale)
+    const hasMeters = e.props.bodyColumns >= 56
+
+    const meter = (w: WindowView) => {
+      const mine = clamp(w.minePct ?? 0)
+      const used = clamp(w.accountPct)
+      const a = Math.min(BAND_CELLS, Math.round((mine / 100) * BAND_CELLS) || (mine > 0 ? 1 : 0))
+      const b = Math.max(0, Math.min(BAND_CELLS - a, Math.round((used / 100) * BAND_CELLS) - a))
+      return [
+        <Text color="claude">{'━'.repeat(a)}</Text>,
+        <Text color="inactive">{'━'.repeat(b)}</Text>,
+        <Text dimColor>{'─'.repeat(BAND_CELLS - a - b)}</Text>,
+      ]
+    }
+
+    const chip = (w: WindowView, i: number) => [
+      i > 0 ? <Text dimColor>{'   '}</Text> : null,
+      <Text dimColor>{w.kind === 'five_hour' ? '5 ч ' : 'неделя '}</Text>,
+      ...(hasMeters ? [...meter(w), <Text>{' '}</Text>] : []),
+      <Text color="claude" weight="semibold" tabular>
+        {pct(w.minePct)}
+      </Text>,
+    ]
 
     return (
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text dimColor wrap="truncate-end">{`Эта сессия: ${summary}`}</Text>
-        <Button
-          key="open-limits"
-          label="Лимиты"
-          onPress={async () => {
-            void tick($)
-            await $.ui.open({ id: PANE, title: TITLE })
-          }}
-        />
-      </Box>
+      <Button key="open-limits" plain onPress={open}>
+        <Text weight="medium">{'Лимиты сессии  '}</Text>
+        {windows.length > 0 ? (
+          windows.flatMap(chip)
+        ) : (
+          <Text dimColor>{view ? 'ждём ответ API' : 'собираю данные…'}</Text>
+        )}
+        <Text dimColor>{'  ›'}</Text>
+      </Button>
     )
   })
 
